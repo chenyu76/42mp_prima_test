@@ -11,3 +11,10 @@ MASTSIF_DIR: Path | None = Path(".venv/cutest/share/mastsif-full")
 
 # Keep the math library linked for GCC's vectorized Fortran functions.
 LINKER_FLAGS: str = "-Wl,--no-as-needed -lm -lmvec"
+
+TOUGH_RUNS: int = 10
+TOUGH_SEED: int = 0
+TOUGH_NOISE_LEVEL: float = 0.2
+TOUGH_WITH_FAILURE: bool = True
+TOUGH_INVALID_LINEAR: bool = True
+TOUGH_FIXED_VARIABLES: bool = True
