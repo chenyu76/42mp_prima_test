@@ -5,7 +5,7 @@ import numpy as np
 from numpy.testing import assert_array_equal, assert_allclose
 
 from problem import Problem
-from read_pycutest_problems import _convert_problem
+from get_pycutest_problems import _convert_problem
 from transform_problems import make_tough_problem, transform_problems
 
 

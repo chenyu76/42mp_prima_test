@@ -1,6 +1,12 @@
 from __future__ import annotations
 
 import os
+import re
+import warnings
+from contextlib import redirect_stdout
+from io import StringIO
+from itertools import product
+from collections.abc import Iterator
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -12,8 +18,10 @@ if TYPE_CHECKING:
     from pycutest import CUTEstProblem
 
 
-def read_pycutest_problems() -> list[Problem]:
-    """No inputs. Return derivative-free problems loaded from PyCUTEst."""
+def get_pycutest_problems(min_dimension: int, max_dimension: int) -> list[Problem]:
+    """Return available SIF-listed dimensions in the inclusive interval."""
+    if min_dimension < 0 or max_dimension < min_dimension:
+        raise ValueError("Require 0 <= min_dimension <= max_dimension.")
     for variable, directory in (
         ("CUTEST", CUTEST_DIR),
         ("SIFDECODE", SIFDECODE_DIR),
@@ -26,7 +34,43 @@ def read_pycutest_problems() -> list[Problem]:
 
     import pycutest
 
-    return [_convert_problem(pycutest.import_problem(name)) for name in pycutest.find_problems()]
+    problems: list[Problem] = []
+    for name in pycutest.find_problems():
+        dimensions: set[int] = set()
+        for parameters in _parameter_combinations(name):
+            try:
+                source = pycutest.import_problem(name, sifParams=parameters or None)
+            except (RuntimeError, ImportError) as error:
+                warnings.warn(f"Unavailable problem {name}, parameters {parameters}: {error}")
+                continue
+            if min_dimension <= source.n <= max_dimension and source.n not in dimensions:
+                problem = _convert_problem(source)
+                if parameters:
+                    problem.name = f"{name}_n{source.n}"
+                problems.append(problem)
+                dimensions.add(source.n)
+    return problems
+
+
+def _parameter_combinations(name: str) -> Iterator[dict[str, int | float]]:
+    """Enumerate the parameter values listed by SIFDecode."""
+    import pycutest
+
+    output = StringIO()
+    with redirect_stdout(output):
+        pycutest.print_available_sif_params(name)
+    choices: dict[str, list[int | float]] = {}
+    for line in output.getvalue().splitlines():
+        match = re.match(r"^(\S+) = (\S+) \((int|float)\b", line)
+        if match is None:
+            continue
+        parameter, text, kind = match.groups()
+        value = int(float(text)) if kind == "int" else float(text)
+        values = choices.setdefault(parameter, [])
+        if value not in values:
+            values.append(value)
+    for values in product(*choices.values()):
+        yield dict(zip(choices, values))
 
 
 def _bounds(lower: FloatArray, upper: FloatArray) -> tuple[FloatArray, FloatArray]:
