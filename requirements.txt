@@ -1,0 +1,4 @@
+numpy==2.2.6
+pycutest==1.8.2
+
+# Native dependencies installed separately: CUTEst 2.7.1 and SIFDecode 3.1.1.

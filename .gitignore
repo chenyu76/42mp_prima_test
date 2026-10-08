@@ -1,1 +1,4 @@
 test_bit_consistency/
+.venv/
+__pycache__/
+pycutest_cache_holder/

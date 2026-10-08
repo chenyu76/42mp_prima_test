@@ -1,44 +1,40 @@
 #!./.venv/bin/python
 
+from __future__ import annotations
+
+import os
 from dataclasses import fields
-from pathlib import Path
 
-import matlab.engine
-
-from config import MATCUTEST_DIR
-from problem import MatlabFunction, Problem
+from config import CUTEST_DIR, LINKER_FLAGS, MASTSIF_DIR, PROJECT_DIR, SIFDECODE_DIR
+from problem import Problem
 
 
-def read_matcutest_problems() -> list[Problem]:
-    engine = matlab.engine.start_matlab()
-    try:
-        engine.addpath(str(Path(__file__).parent), nargout=0)
-        engine.addpath(str(MATCUTEST_DIR), nargout=0)
-        engine.addpath(str(MATCUTEST_DIR / "src/matcutest/mtools/src"), nargout=0)
-        names = engine.matcutest_select(engine.struct())
-        problems: list[Problem] = []
-        for name in names:
-            metadata = engine.matcutest_bridge(name)
-            for field in ("objective", "grad", "hprod", "nonlcon"):
-                metadata[field] = (
-                    MatlabFunction(engine, name, field) if metadata[field] else None
-                )
-            for field in fields(Problem):
-                if field.type is int:
-                    metadata[field.name] = int(metadata[field.name])
-                elif field.type is matlab.double and isinstance(
-                    metadata[field.name], float
-                ):
-                    metadata[field.name] = matlab.double([[metadata[field.name]]])
-            problems.append(Problem(**metadata))
-        return problems
-    except Exception:
-        engine.quit()
-        raise
+def read_pycutest_problems() -> list[Problem]:
+    """No inputs. Return custom Problem objects loaded from PyCUTEst."""
+    for variable, directory in (
+        ("CUTEST", CUTEST_DIR),
+        ("SIFDECODE", SIFDECODE_DIR),
+        ("MASTSIF", MASTSIF_DIR),
+    ):
+        if directory is not None:
+            os.environ[variable] = str((PROJECT_DIR / directory).resolve())
+    os.environ["PYCUTEST_CACHE"] = str(PROJECT_DIR)
+    os.environ["LDFLAGS"] = LINKER_FLAGS
+
+    import pycutest
+
+    problems: list[Problem] = []
+    for name in pycutest.find_problems():
+        source = pycutest.import_problem(name)
+        problems.append(
+            Problem(**{field.name: getattr(source, field.name) for field in fields(Problem)})
+        )
+    return problems
 
 
 def read_problems() -> list[Problem]:
-    return read_matcutest_problems()
+    """Return the problem collection."""
+    return read_pycutest_problems()
 
 
 def test() -> None:
