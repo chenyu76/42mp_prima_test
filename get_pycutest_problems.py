@@ -2,9 +2,8 @@ from __future__ import annotations
 
 import os
 import re
+import subprocess
 import warnings
-from contextlib import redirect_stdout
-from io import StringIO
 from itertools import product
 from collections.abc import Iterator
 from typing import TYPE_CHECKING
@@ -53,22 +52,30 @@ def get_pycutest_problems(min_dimension: int, max_dimension: int) -> list[Proble
 
 
 def _parameter_combinations(name: str) -> Iterator[dict[str, int | float]]:
-    """Enumerate the parameter values listed by SIFDecode."""
-    import pycutest
+    """Enumerate independent SIF parameters, preserving numeric precision."""
+    from pycutest.system_paths import get_mastsif_path, get_sifdecoder_path
 
-    output = StringIO()
-    with redirect_stdout(output):
-        pycutest.print_available_sif_params(name)
+    output = subprocess.run(
+        [get_sifdecoder_path(), "-show", os.path.join(get_mastsif_path(), name + ".SIF")],
+        check=True, capture_output=True, text=True,
+    )
     choices: dict[str, list[int | float]] = {}
-    for line in output.getvalue().splitlines():
-        match = re.match(r"^(\S+) = (\S+) \((int|float)\b", line)
+    defaults: set[str] = set()
+    for line in output.stdout.splitlines():
+        match = re.match(r"^\s*(\S+)=(\S+)\s+\((IE|RE)\)(.*)$", line)
         if match is None:
             continue
-        parameter, text, kind = match.groups()
-        value = int(float(text)) if kind == "int" else float(text)
+        parameter, text, kind, annotation = match.groups()
+        if re.search(r"\bfor\b", annotation, re.IGNORECASE):
+            continue
+        value = int(text) if kind == "IE" else float(text.replace("D", "e").replace("d", "e"))
         values = choices.setdefault(parameter, [])
         if value not in values:
             values.append(value)
+        if "-default value-" in annotation:
+            defaults.add(parameter)
+    # Keep fixed defaults in SIF; explicitly supply a lone value if no default exists.
+    choices = {key: values for key, values in choices.items() if len(values) > 1 or key not in defaults}
     for values in product(*choices.values()):
         yield dict(zip(choices, values))
 

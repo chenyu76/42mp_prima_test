@@ -1,4 +1,5 @@
 test_bit_consistency/
+optiprofiler/
 .venv/
 __pycache__/
 pycutest_cache_holder/
