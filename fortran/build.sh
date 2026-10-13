@@ -6,3 +6,4 @@ set -e
 target="./generated/"
 rm -rf $target
 42mp -r ./ -o $target
+cp ./*.m $target
