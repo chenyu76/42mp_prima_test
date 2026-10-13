@@ -8,7 +8,16 @@ contains
    function get_problems() result(problems)
       ! No inputs. Return the original problem collection.
       type(problem), allocatable :: problems(:)
-      ! TODO: Load the problem collection from MatCUTEst.
+      interface
+         ! this function is defined in MATLAB
+         function get_matcutest_problems(min_dimension, max_dimension) result(selected)
+            import :: problem
+            integer, intent(in) :: min_dimension, max_dimension
+            type(problem), allocatable :: selected(:)
+         end function get_matcutest_problems
+      end interface
+
+      problems = get_matcutest_problems(1, 5)
    end function get_problems
 
    function transform_problems(problems) result(transformed_problems)
