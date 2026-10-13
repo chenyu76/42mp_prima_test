@@ -1,0 +1,11 @@
+--- a/build_interface.py
++++ b/build_interface.py
+@@ -31,7 +31,7 @@
+             k_to_use = k_to_use.replace(str_from, str_to)
+         param_str += '%s%g_' % (k_to_use, params[k])
+     param_str = param_str.rstrip('_')
+-    return param_str
++    return param_str.replace('.', 'p')
+ 
+ 
+ def get_problem_directory(problemName, sifParams=None, saved_with_param_name=True):

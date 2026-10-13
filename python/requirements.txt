@@ -1,4 +1,8 @@
 numpy==2.2.6
 pycutest==1.8.2
+matlabengine>=26.1,<26.2
+tqdm
+
+# MATLAB Engine requires a local MATLAB R2026a installation.
 
 # Native dependencies installed separately: CUTEst 2.7.1 and SIFDecode 3.1.1.

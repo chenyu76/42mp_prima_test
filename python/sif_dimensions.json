@@ -1,0 +1,44 @@
+{
+  "CHARDIS0": {
+    "sha256": "ed71eddeaeee465989969cb31f69600df76195549ea28dc4b9d02400703c5ad3",
+    "basis": "Two free coordinates per charge; bounds have positive width.",
+    "parameter": "NP1",
+    "dimensions": {"5": 10, "9": 18, "20": 40, "30": 60, "50": 100, "100": 200, "200": 400, "500": 1000, "1000": 2000, "2000": 4000, "5000": 10000}
+  },
+  "CHARDIS02": {
+    "sha256": "d1bb24544bdb740447d76020d6ace6c0215fcfe26b40741d6b9a5ccfc6701234",
+    "basis": "Two free coordinates per charge; bounds have positive width.",
+    "parameter": "NP1",
+    "dimensions": {"5": 10, "9": 18, "20": 40, "30": 60, "50": 100, "100": 200, "200": 400, "500": 1000, "1000": 2000, "2000": 4000, "5000": 10000}
+  },
+  "CHARDIS1": {
+    "sha256": "f95350ec0f00b265d360648a0aad8550f101d705a4fa1ddedd1aa90b599e2fd7",
+    "basis": "Two coordinates per charge; the first charge has two fixed coordinates.",
+    "parameter": "NP1",
+    "dimensions": {"5": 8, "8": 14, "20": 38, "50": 98, "100": 198, "200": 398, "500": 998, "1000": 1998, "2000": 3998, "5000": 9998}
+  },
+  "CHARDIS12": {
+    "sha256": "6c5c8217c712c450303bfcd2e469e61c44811cc0d1b5d02af8c3e40368c5379e",
+    "basis": "Two coordinates per charge; the first charge has two fixed coordinates.",
+    "parameter": "NP1",
+    "dimensions": {"5": 8, "8": 14, "20": 38, "50": 98, "100": 198, "200": 398, "500": 998, "1000": 1998, "2000": 3998, "5000": 9998}
+  },
+  "PDE1": {
+    "sha256": "2601fac782fbced41c1da548225f310054677a8bf137e236ceaac326f5258711",
+    "basis": "An (N+2) by (N+2) grid and one scalar T; all bounds have positive width.",
+    "parameter": "N",
+    "dimensions": {"3": 26, "299": 90602, "2999": 9006002, "2099": 4414202}
+  },
+  "PDE2": {
+    "sha256": "83732b427767fdbae6464cbe026d121cadea8f9639e678a277ba25e55f257d4c",
+    "basis": "An (N+2) by (N+2) X grid and an N by (N+2) T grid; all bounds have positive width.",
+    "parameter": "N",
+    "dimensions": {"3": 40, "299": 180600, "2999": 18006000, "2099": 8824200, "1299": 3382600}
+  },
+  "ROSEPETAL": {
+    "sha256": "02940ce9ea0f350c36749461df99a954a31eed06fb19b0dfa9fc6996ce08a57f",
+    "basis": "N free variables X(1)..X(N); R changes the constraint radius.",
+    "parameter": "N",
+    "dimensions": {"2": 2, "10": 10, "100": 100, "1000": 1000, "10000": 10000, "100000": 100000}
+  }
+}

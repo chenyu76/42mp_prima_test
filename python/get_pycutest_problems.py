@@ -4,14 +4,17 @@ import os
 import re
 import subprocess
 import warnings
+from pathlib import Path
 from itertools import product
 from collections.abc import Iterator
 from typing import TYPE_CHECKING
 
 import numpy as np
+from tqdm import tqdm
 
 from config import CUTEST_DIR, LINKER_FLAGS, MASTSIF_DIR, PROJECT_DIR, SIFDECODE_DIR
 from problem import FloatArray, Problem
+from pycutest_dimensions import DimensionIndex
 
 if TYPE_CHECKING:
     from pycutest import CUTEstProblem
@@ -34,46 +37,60 @@ def get_pycutest_problems(min_dimension: int, max_dimension: int) -> list[Proble
     import pycutest
 
     problems: list[Problem] = []
-    for name in pycutest.find_problems():
-        dimensions: set[int] = set()
-        for parameters in _parameter_combinations(name):
-            try:
-                source = pycutest.import_problem(name, sifParams=parameters or None)
-            except (RuntimeError, ImportError) as error:
-                warnings.warn(f"Unavailable problem {name}, parameters {parameters}: {error}")
-                continue
-            if min_dimension <= source.n <= max_dimension and source.n not in dimensions:
-                problem = _convert_problem(source)
-                if parameters:
-                    problem.name = f"{name}_n{source.n}"
-                problems.append(problem)
-                dimensions.add(source.n)
+    names = pycutest.find_problems()
+    index = DimensionIndex(PROJECT_DIR / ".venv/pycutest_dimensions.json")
+    with tqdm(total=len(names), desc="Loading problems", unit="problem") as progress:
+        try:
+            for name in names:
+                dimensions: set[int] = set()
+                progress.set_postfix_str(name)
+                for parameters in index.parameters(name):
+                    progress.set_postfix_str(f"{name} {parameters}" if parameters else name)
+                    try:
+                        n = index.get(name, parameters)
+                        if not min_dimension <= n <= max_dimension or n in dimensions:
+                            continue
+                        source = pycutest.import_problem(name, sifParams=parameters or None)
+                    except (RuntimeError, ImportError, subprocess.CalledProcessError) as error:
+                        warnings.warn(f"Unavailable problem {name}, parameters {parameters}: {error}")
+                        continue
+                    if min_dimension <= source.n <= max_dimension and source.n not in dimensions:
+                        problem = _convert_problem(source)
+                        if parameters:
+                            problem.name = f"{name}_n{source.n}"
+                        problems.append(problem)
+                        dimensions.add(source.n)
+                progress.update(1)
+        finally:
+            index.save()
     return problems
 
 
 def _parameter_combinations(name: str) -> Iterator[dict[str, int | float]]:
-    """Enumerate independent SIF parameters, preserving numeric precision."""
-    from pycutest.system_paths import get_mastsif_path, get_sifdecoder_path
+    """Read independent parameter choices directly from their SIF definitions."""
+    from pycutest.system_paths import get_mastsif_path
 
-    output = subprocess.run(
-        [get_sifdecoder_path(), "-show", os.path.join(get_mastsif_path(), name + ".SIF")],
-        check=True, capture_output=True, text=True,
-    )
+    sif = Path(get_mastsif_path()) / (name + ".SIF")
     choices: dict[str, list[int | float]] = {}
     defaults: set[str] = set()
-    for line in output.stdout.splitlines():
-        match = re.match(r"^\s*(\S+)=(\S+)\s+\((IE|RE)\)(.*)$", line)
-        if match is None:
-            continue
-        parameter, text, kind, annotation = match.groups()
-        if re.search(r"\bfor\b", annotation, re.IGNORECASE):
-            continue
-        value = int(text) if kind == "IE" else float(text.replace("D", "e").replace("d", "e"))
-        values = choices.setdefault(parameter, [])
-        if value not in values:
-            values.append(value)
-        if "-default value-" in annotation:
-            defaults.add(parameter)
+    with sif.open(errors="replace") as stream:
+        for line in stream:
+            # SIFDecode recognizes this marker only in columns 40--50.
+            kind = line[1:3]
+            if line[39:50] != "$-PARAMETER" or kind not in ("IE", "RE"):
+                continue
+            comment = line[:1] == "*"
+            parameter, text, annotation = line[4:14].strip(), line[24:36].strip(), line[50:]
+            if re.search(r"\bfor\b", annotation, re.IGNORECASE):
+                continue
+            value = float(text.replace("D", "e").replace("d", "e"))
+            if kind == "IE":
+                value = int(value)
+            values = choices.setdefault(parameter, [])
+            if value not in values:
+                values.append(value)
+            if not comment:
+                defaults.add(parameter)
     # Keep fixed defaults in SIF; explicitly supply a lone value if no default exists.
     choices = {key: values for key, values in choices.items() if len(values) > 1 or key not in defaults}
     for values in product(*choices.values()):

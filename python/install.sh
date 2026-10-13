@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Install Python dependencies, CUTEst, SIFDecode, and the complete MASTSIF library.
 # Linux prerequisites: Python 3.10 with headers and venv, gcc, gfortran,
-# curl, tar, meson, and ninja. Usage: ./install.sh [python-executable]
+# curl, tar, meson, ninja, and patch. Usage: ./install.sh [python-executable]
 set -euo pipefail
 
 project_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
@@ -12,7 +12,7 @@ if [[ "$(uname -s)" != Linux ]]; then
     echo "This installation script supports Linux." >&2
     exit 1
 fi
-for command in "$python_bin" gcc gfortran curl tar meson ninja; do
+for command in "$python_bin" gcc gfortran curl tar meson ninja patch; do
     if ! command -v "$command" >/dev/null; then
         echo "Missing prerequisite: $command" >&2
         exit 1
@@ -21,6 +21,15 @@ done
 "$python_bin" -c 'import sysconfig; from pathlib import Path; assert (Path(sysconfig.get_path("include")) / "Python.h").is_file(), "Python development headers are missing"'
 "$python_bin" -m venv .venv
 .venv/bin/python -m pip install --no-cache-dir -r requirements.txt
+
+# Python package names cannot contain parameter value decimal points.
+pycutest_package_dir="$(.venv/bin/python -c 'from importlib.util import find_spec; from pathlib import Path; print(Path(find_spec("pycutest").origin).parent)')"
+if patch --directory="$pycutest_package_dir" -p1 --forward --dry-run --silent < pycutest_cache_names.patch; then
+    patch --directory="$pycutest_package_dir" -p1 < pycutest_cache_names.patch
+elif ! patch --directory="$pycutest_package_dir" -p1 --reverse --dry-run --silent < pycutest_cache_names.patch; then
+    echo "The PyCUTEst cache-name patch does not match the installed package." >&2
+    exit 1
+fi
 
 prefix="$project_dir/.venv/cutest"
 work_dir="$project_dir/.venv/install"
@@ -59,6 +68,8 @@ build_native() {
 }
 
 fetch_source "https://github.com/ralna/SIFDecode/archive/$sifdecode_revision.tar.gz" sifdecode
+# Preserve other definitions when parameter alternatives are interleaved.
+patch --directory="$work_dir/sifdecode" -p1 < sifdecode_parameters.patch
 build_native sifdecode
 fetch_source "https://github.com/ralna/CUTEst/archive/$cutest_revision.tar.gz" cutest
 build_native cutest -Dmodules=false
@@ -84,3 +95,7 @@ PY
 
 # Remove downloaded sources, duplicate data, and build files after verification.
 rm -rf -- "$work_dir"
+
+# Prepare dimensions once so normal problem selection never decodes large cases.
+# Missing configurations may take substantial time on the first preparation.
+.venv/bin/python prepare_pycutest_dimensions.py

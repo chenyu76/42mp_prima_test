@@ -2,6 +2,18 @@ from pathlib import Path
 
 
 PROJECT_DIR: Path = Path(__file__).resolve().parent
+MATCUTEST_DIR: Path = Path(".venv/matcutest")
+
+# Leave None if the solver functions are already on the MATLAB path.
+PRIMA_DIR: Path | None = Path(".venv/prima")
+PRIMA_SOURCE_DIR: Path = Path("../../port_preprima/prima")
+
+MATLAB_STARTUP_OPTIONS: str = "-nodesktop -nosplash -licmode onlinelicensing"
+# Match this machine's MATLAB launcher; set None on systems that do not need it.
+MATLAB_LD_PRELOAD: str | None = (
+    "/usr/lib/libstdc++.so.6 /usr/lib/libgcc_s.so.1 /usr/lib/libtcmalloc.so "
+    "/usr/lib/libxkbcommon.so.0 /usr/lib/libxkbcommon-x11.so.0"
+)
 
 # Set installation paths relative to PROJECT_DIR, or leave None to use
 # existing environment variables and PyCUTEst's default locations.

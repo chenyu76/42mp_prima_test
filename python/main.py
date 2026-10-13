@@ -13,6 +13,8 @@ def get_problems() -> list[Problem]:
 
 def test() -> None:
     problems = get_problems()
+    for p in problems:
+        print(p.name)
     transformed_problems = transform_problems(problems)
 
 
