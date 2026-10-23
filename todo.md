@@ -1,60 +1,5 @@
 # TODO
 
-```
-
-
-
-
-    ┌───────────────────┐
-    │ MatCutest         │
-    └──┬────────────────┘
-       ↓
-    ┌───────────────────┐
-    │ Problems          │
-    └──┬────────────────┘       ┌──────────────────────────────────────────────────────┐
-       │                        │ list of solver                                       │
-       │                         ┌─────────┐      ┌─────────────────┐     ┌─────────┐
-       │                     ┌──→│ matlab  ├─────→│ matlab solver A │───→ │ python  ├─┐
-       ↓                     │   │ wrapper │      └─────────────────┘     │ wrapper │ │
-  ┌───────────────────────┐  │   └─────────┘                              └─────────┘ │
-  │ status listener       │  │                    ┌─────────────────┐                 │
-  │                 init  ├──┤                    │ matlab solver B │                 │
-  │                       │  │   ┌─────────┐      │                 │     ┌─────────┐ │
-  │        record status  │  │   │ matlab  ├─────→input        output───→ │ python  ├─┴──┐
-  │                       │  └──→│ wrapper │      │                 │     │ wrapper │    │
-  │                       │      └─────────┘      └─────────────────┘     └─────────┘    │
-  │                       │                                                              │
-  │                       │     │ ......                                               │ │
-  │            status     │     └──────────────────────────────────────────────────────┘ │
-  └───────────────┬───────┘                                                              │
-                  │                                                                      │
-          ┌───────┴──────────────────────────────────────────────────────────────────────┘
-          │
-          ↓
-    ┌───────────────────────────────────┐
-    │  outputs                          │ ┌─                 Solver A      Solver B       ...
-      ┌───────────────────────────────┐   │ ─────────────────────────────────────────────────────
-      │               solver A output │   │ output
-      │ problem 1                     ├───┤ ──────────┬──────────────────────────────────────────
-      │               solver B output │   │ history x │ 1
-      └───────────────────────────────┘   │           ├──────────────────────────────────────────
-      ┌───────────────────────────────┐   │           │ 2
-      │               solver A output │   │           ├──────────────────────────────────────────
-      │ problem 2                     │   │           │ ...
-      │               solver B output │   │ ──────────┼──────────────────────────────────────────
-      └───────────────────────────────┘   │ history f │ 1
-    │  ......                           │ │           ├──────────────────────────────────────────
-    └───────────────────────────────────┘ │           │ 2
-                                          │           ├──────────────────────────────────────────
-                                          │           │ ...
-                                          │ ──────────┴──────────────────────────────────────────
-                                          │ ......
-                                          │ find diff
-                                          └─
-
-
-```
-
 ## Test
 
 ```text
@@ -69,6 +14,8 @@
 ```
 
 ## test that test is also a test
+
+(已放弃)
 
 ```
 ┌──────────────────────────────┐ The Translator ┌────────────────────────────┐
@@ -88,27 +35,41 @@ Benefit:
 
 ```text
  ┌───────────┐
- │ MatCutest │
+ │ MatCutest │ (A struct)
  └───────────┘
        ↓Problem Loader
  ┌───────────┐
- │ Problems  │
+ │ Problems  │  (A struct)
  └───────────┘
+       ↓toughing
+ ┌─────────────────┐
+ │ tough Problems  │  (A struct)
+ └─────────────────┘
        ↓Problem wrapper
  ┌────────────────────────┐
- │ Value Recorded Problem │
+ │ Value Recorded Problem │  (A class providing interface)
  └────────────────────────┘
 ```
 
 Value Recorded Problem 可以记录函数名以及每一次调用时的函数值，选点，Aeq beq等，整理为一个结构数组
 
+## flow
+
+1. get problem
+2. tough problem
+3. wrap problem
+4. run problem in two solver
+5. compare result
+
 ## Compare Data
 
-Each Solver gernerate a data tree.
+Each Solver gernerate a data tree. In Matlab, it is nested struct.
 
 Recursively compare the tree child by child.
 
 Show only the diff of the tree.
+
+The comparing function should work for any nested struct.
 
 ```
  Solver A─┬─Problem A─┬─evalutions─┬─f─┬─$f_1$   Solver B─┬─Problem A─┬─evalutions─┬─f─┬─$f_1$
