@@ -1,6 +1,8 @@
 function problems = load_matcutest_problems(mindim, maxdim)
     % LOAD_MATCUTEST_PROBLEMS Load all constraint types in PRIMA struct format.
     % Includes the MatCUTEst name as metadata alongside the PRIMA inputs.
+    % f0 is the unperturbed objective at x0, used as the ftarget scale reference
+    % even after tough_problems changes x0 and the objective callback.
     % Requires the environment to have been prepared before calling.
     arguments (Input)
         mindim (1, 1) double {mustBeInteger, mustBePositive}
@@ -12,12 +14,13 @@ function problems = load_matcutest_problems(mindim, maxdim)
 
     assert(mindim <= maxdim, 'mindim must not exceed maxdim.');
     names = secup(struct('mindim', mindim, 'maxdim', maxdim, 'type', 'ubln'));
-    template = struct('name', '', 'objective', [], 'x0', [], 'Aineq', [], 'bineq', [], ...
+    template = struct('name', '', 'f0', NaN, 'objective', [], 'x0', [], 'Aineq', [], 'bineq', [], ...
                       'Aeq', [], 'beq', [], 'lb', [], 'ub', [], 'nonlcon', []);
     problems = repmat(template, 1, numel(names));
 
     for i = 1:numel(names)
         source = macup(names{i});
+        problems(i).f0 = source.f0;
         problems(i).name = source.name;
         % Bind the objective to this problem's MEX before another load.
         entry = str2func('mcutest');

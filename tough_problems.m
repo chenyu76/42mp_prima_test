@@ -1,29 +1,39 @@
-function problems = tough_problems(base_problems)
+function problems = tough_problems(base_problems, seeds)
     % TOUGH_PROBLEMS Make one tough PRIMA problem per input problem.
     % Uses noise level 0.2, fixed variables, invalid linear data, and evaluation
     % failures. Each callback repeats its perturbation at the same input point.
+    % Optional seeds give one seed per problem; omitted seeds are drawn from
+    % the caller's stream. Each seed controls all data and evaluation changes.
     arguments (Input)
         base_problems (1, :) struct
+        seeds (1, :) double {mustBeInteger, mustBeNonnegative, mustBeLessThan(seeds, 4294967296)} = []
     end
     arguments (Output)
         problems (1, :) struct
     end
 
+    if isempty(seeds)
+        seeds = randi(2^32 - 1, 1, numel(base_problems));
+    end
+    assert(numel(seeds) == numel(base_problems), 'Provide one seed per problem.');
     problems = base_problems;
     for i = 1:numel(base_problems)
-        problems(i) = perturb_problem(base_problems(i), randi(2^32 - 1));
+        problems(i) = perturb_problem(base_problems(i), seeds(i));
     end
 end
 
 function problem = perturb_problem(base, seed)
-    arguments
+    arguments (Input)
         base (1, 1) struct
         seed (1, 1) double
     end
+    arguments (Output)
+        problem (1, 1) struct
+    end
+    rng_cleanup = seed_rng(seed); %#ok<NASGU>
     problem = base;
     noise_level = 0.2;
-    % The seed controls evaluation noise; data perturbations use the caller's stream.
-    problem.name = sprintf('%s_tough_noise%g_fail1_invalid1_fixed1_eval_seed%010u', ...
+    problem.name = sprintf('%s_tough_noise%g_fail1_invalid1_fixed1_seed%010u', ...
         base.name, noise_level, uint32(seed));
     problem.x0 = base.x0 + noise_level * max(1, abs(base.x0)) .* randn(size(base.x0));
 
@@ -66,7 +76,11 @@ function problem = perturb_problem(base, seed)
 end
 
 function [A, b] = perturb_linear(A, b)
-    arguments
+    arguments (Input)
+        A double
+        b double
+    end
+    arguments (Output)
         A double
         b double
     end
@@ -84,19 +98,26 @@ function [A, b] = perturb_linear(A, b)
 end
 
 function value = perturb_objective(objective, x, seed)
-    arguments
+    arguments (Input)
         objective (1, 1) function_handle
         x double
         seed (1, 1) double
+    end
+    arguments (Output)
+        value (1, 1) double
     end
     value = contaminate(objective(x), x, seed, 0);
 end
 
 function [cineq, ceq] = perturb_nonlcon(nonlcon, x, seed)
-    arguments
+    arguments (Input)
         nonlcon (1, 1) function_handle
         x double
         seed (1, 1) double
+    end
+    arguments (Output)
+        cineq double
+        ceq double
     end
     [cineq, ceq] = nonlcon(x);
     for i = 1:numel(cineq)
@@ -108,19 +129,20 @@ function [cineq, ceq] = perturb_nonlcon(nonlcon, x, seed)
 end
 
 function value = contaminate(value, x, seed, salt)
-    arguments
+    arguments (Input)
         value (1, 1) double
         x double
         seed (1, 1) double
         salt (1, 1) double
     end
-    % Restore the caller's random stream even when evaluation throws.
-    original_rng = rng();
-    cleanup = onCleanup(@() rng(original_rng));
+    arguments (Output)
+        value (1, 1) double
+    end
     % Derive repeatable noise from the point; salt separates output components.
     point_hex = num2hex(x(:));
     local_seed = mod(seed + salt + sum(double(point_hex(:))), 2^32);
-    rng(local_seed, 'twister');
+    % Evaluation noise must not consume the solver's random stream, even on errors.
+    rng_cleanup = seed_rng(local_seed); %#ok<NASGU>
     value = value * (1 + 0.2 * randn());
     r = 2 * rand() - 1;
     if r > 0.9

@@ -1,40 +1,52 @@
-function differences = main(prima_dir, matcutest_paths, mindim, maxdim, n_jobs)
+function [differences, problem_list] = main(prima_dir, matcutest_paths, mindim, maxdim, n_jobs, run_seed)
     % MAIN Entry point for the rewritten bit-consistency test.
-    % Returns the difference tree and saves results/<timestamp>/differences.json.
+    % Returns differences and problem_list, saved under results/<timestamp>/.
     arguments (Input)
         prima_dir (1, 1) string
         matcutest_paths (1, :) string
         mindim (1, 1) double {mustBeInteger, mustBePositive}
         maxdim (1, 1) double {mustBeInteger, mustBePositive}
         n_jobs (1, 1) double {mustBeInteger, mustBePositive}
+        run_seed (1, 1) double {mustBeInteger, mustBeNonnegative, mustBeLessThan(run_seed, 4294967296)} = 0
     end
     arguments (Output)
         differences (1, 1) struct
+        problem_list (1, :) struct
     end
 
     prepare_environment(prima_dir, matcutest_paths);
-    differences = test(mindim, maxdim, n_jobs);
-    save_test_output(differences);
+    [differences, problem_list] = test(mindim, maxdim, n_jobs, run_seed);
+    save_test_output(differences, problem_list);
 end
 
-function save_test_output(differences)
+function save_test_output(differences, problem_list)
     arguments
         differences (1, 1) struct
+        problem_list (1, :) struct
     end
 
-    text = jsonencode(prepare_json_value(differences), 'PrettyPrint', true);
     stamp = char(datetime('now', 'Format', 'yyyyMMdd_HHmmss'));
     output_dir = fullfile(fileparts(mfilename('fullpath')), 'results', stamp);
     [created, message] = mkdir(output_dir);
     assert(created, 'Cannot create output directory %s: %s', output_dir, message);
-    output_file = fullfile(output_dir, 'differences.json');
+    write_json(fullfile(output_dir, 'differences.json'), differences);
+    write_json(fullfile(output_dir, 'problems.json'), problem_list);
+    fprintf('Test output saved in %s\n', output_dir);
+end
+
+function write_json(output_file, value)
+    arguments
+        output_file (1, :) char
+        value
+    end
+
+    text = jsonencode(prepare_json_value(value), 'PrettyPrint', true);
     file_id = fopen(output_file, 'w');
     assert(file_id >= 0, 'Cannot open output file: %s', output_file);
     cleanup = onCleanup(@() fclose(file_id));
     bytes = unicode2native([text, newline], 'UTF-8');
     written = fwrite(file_id, bytes, 'uint8');
     assert(written == numel(bytes), 'Incomplete write of test output: %s', output_file);
-    fprintf('Test output saved in %s\n', output_file);
 end
 
 function encoded = prepare_json_value(value)
@@ -46,6 +58,10 @@ function encoded = prepare_json_value(value)
         encoded
     end
 
+    % MatCUTEst linear constraints can be sparse; JSON needs dense array values.
+    if issparse(value)
+        value = full(value);
+    end
     encoded = value;
     if isstruct(value)
         fields = fieldnames(value);
@@ -73,7 +89,7 @@ function encoded = prepare_json_value(value)
             end
         elseif any(~isfinite(value) | negative_zero, 'all')
             % Mixed numeric/string arrays need cells, retaining element positions.
-            encoded = prepare_json_value(num2cell(full(value)));
+            encoded = prepare_json_value(num2cell(value));
         end
     elseif isa(value, 'function_handle')
         encoded = func2str(value);
