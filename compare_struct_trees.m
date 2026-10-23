@@ -1,10 +1,11 @@
 function differences = compare_struct_trees(tree_a, tree_b, label_a, label_b)
     % COMPARE_STRUCT_TREES Return only differing branches of two struct trees.
     % Scalar struct fields retain their paths. Differing leaves use the
-    % supplied labels; an absent value is represented by missing.
+    % supplied labels; an absent value has no corresponding label field.
     % Array nodes contain positions (one subscript tuple per row). Leaf arrays
     % use two cell columns of values; struct/cell arrays use an elements cell
     % column containing the recursive difference tree at each position.
+    % Leaf arrays with absent coordinates also use elements to omit absent labels.
     % Array size/class differences are recorded under sizes/classes.
     % Floating-point values are compared bitwise, with all NaNs equal.
     arguments (Input)
@@ -43,9 +44,9 @@ function differences = compare_node(a, b, label_a, label_b)
         for i = 1:numel(fields)
             field = fields{i};
             if ~isfield(a, field)
-                child = labeled_values(missing, b.(field), label_a, label_b);
+                child = labeled_values([], b.(field), label_a, label_b, false, true);
             elseif ~isfield(b, field)
-                child = labeled_values(a.(field), missing, label_a, label_b);
+                child = labeled_values(a.(field), [], label_a, label_b, true, false);
             else
                 child = compare_node(a.(field), b.(field), label_a, label_b);
             end
@@ -90,14 +91,15 @@ function differences = compare_arrays(a, b, label_a, label_b)
     values_a = cell(size(changed));
     values_b = cell(size(changed));
     recursive = (isstruct(a) && isstruct(b)) || (iscell(a) && iscell(b));
+    has_absent_elements = false;
     elements = cell(size(changed));
     for i = 1:size(positions, 1)
         position = positions(i, :);
         exists_a = all(position <= size_a);
         exists_b = all(position <= size_b);
-        % MATLAB's untyped missing is a double NaN.
-        value_a = missing;
-        value_b = missing;
+        % Presence is tracked separately so absent values never masquerade as NaN.
+        value_a = [];
+        value_b = [];
         subscripts = num2cell(position);
         if exists_a
             value_a = a(subscripts{:});
@@ -115,7 +117,7 @@ function differences = compare_arrays(a, b, label_a, label_b)
             if exists_a && exists_b
                 child = compare_node(value_a, value_b, label_a, label_b);
             else
-                child = labeled_values(value_a, value_b, label_a, label_b);
+                child = labeled_values(value_a, value_b, label_a, label_b, exists_a, exists_b);
             end
             changed(i) = ~isempty(fieldnames(child));
             elements{i} = child;
@@ -124,14 +126,16 @@ function differences = compare_arrays(a, b, label_a, label_b)
                 ~strcmp(class(a), class(b)) || ~values_equal(value_a, value_b);
             values_a{i} = value_a;
             values_b{i} = value_b;
+            elements{i} = labeled_values(value_a, value_b, label_a, label_b, exists_a, exists_b);
         end
+        has_absent_elements = has_absent_elements || ~exists_a || ~exists_b;
     end
     differences = struct();
     if ~any(changed) && isequal(size_a, size_b) && strcmp(class(a), class(b))
         return
     end
     differences.positions = positions(changed, :);
-    if recursive
+    if recursive || has_absent_elements
         % Keep array coordinates here and preserve field paths inside each child.
         differences.elements = elements(changed);
     else
@@ -161,20 +165,26 @@ function positions = element_positions(value, dimensions)
     positions = [subscripts{:}];
 end
 
-function result = labeled_values(a, b, label_a, label_b)
+function result = labeled_values(a, b, label_a, label_b, exists_a, exists_b)
     arguments (Input)
         a
         b
         label_a (1, 1) string
         label_b (1, 1) string
+        exists_a (1, 1) logical = true
+        exists_b (1, 1) logical = true
     end
     arguments (Output)
         result (1, 1) struct
     end
 
     result = struct();
-    result.(label_a) = a;
-    result.(label_b) = b;
+    if exists_a
+        result.(label_a) = a;
+    end
+    if exists_b
+        result.(label_b) = b;
+    end
 end
 
 function same = values_equal(a, b)
