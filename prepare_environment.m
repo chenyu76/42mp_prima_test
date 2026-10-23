@@ -12,6 +12,7 @@ function prepare_environment(prima_dir, matcutest_paths)
     add_environment_paths(prima_dir, matcutest_paths);
     check_dependencies(prima_dir);
     initialize_prima(prima_dir);
+    setup_prima_mex(prima_dir);
     compile_prima(prima_dir);
     check_runtime(prima_dir);
 end
@@ -118,6 +119,25 @@ function initialize_prima(prima_dir)
     cd(prima_dir);
     % Generate precision/variant lists and install the shared runtime helpers.
     setup('path');
+end
+
+function setup_prima_mex(prima_dir)
+    arguments
+        prima_dir (1, 1) string
+    end
+
+    script_file = fullfile(prima_dir, 'matlab', 'interfaces', 'setup_mex.m');
+    % Translated distributions use this script for Fortran math helpers;
+    % distributions without it are allowed and reported, as requested.
+    if ~isfile(script_file)
+        fprintf('Warning: setup_mex.m not found at %s; skipping.\n', script_file);
+        return
+    end
+
+    original_directory = pwd();
+    % The script can change directory before a compiler error interrupts it.
+    cleanup = onCleanup(@() cd(original_directory));
+    run(script_file);
 end
 
 function compile_prima(prima_dir)
