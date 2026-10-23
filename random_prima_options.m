@@ -19,6 +19,7 @@ function options = random_prima_options(n)
     options.gamma2 = randn();
     options.ctol = 1.0e-3 * randn();
     options.cweight = 1.0e3 * randn();
+    % Keep negative and out-of-range counts to exercise PRIMA's input correction.
     options.npt = floor(10 * randn() * n);
     options.maxfun = floor(10 * randn() * n);
     options.ftarget = 10 * randn();

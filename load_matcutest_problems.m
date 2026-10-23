@@ -19,6 +19,7 @@ function problems = load_matcutest_problems(mindim, maxdim)
         source = macup(names{i});
         % Bind the objective to this problem's MEX before another load.
         entry = str2func('mcutest');
+        % The anonymous function captures this iteration's handle by value.
         problems(i).objective = @(x) entry('obj', x(:));
         problems(i).x0 = source.x0;
         problems(i).Aineq = source.Aineq;

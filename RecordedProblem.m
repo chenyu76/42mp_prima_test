@@ -57,6 +57,7 @@ classdef RecordedProblem < handle
             arguments (Output)
                 index (1, 1) double
             end
+            % Reserve the entry before evaluation so failures retain their input.
             index = numel(obj.evaluations) + 1;
             obj.evaluations(index) = struct('function', function_name, ...
                                             'x', x, 'f', [], 'cineq', [], 'ceq', [], 'error_identifier', "");

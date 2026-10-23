@@ -33,6 +33,7 @@ function problem = perturb_problem(base, seed)
     if isempty(ub)
         ub = Inf(size(base.x0));
     end
+    % Clip working bounds; the masks below leave infinite bounds unchanged.
     lb_work = max(-1.0e10, lb);
     ub_work = min(1.0e10, ub);
     scale = noise_level * 0.9 * min(1, max(0, ub_work - lb_work));
@@ -42,6 +43,7 @@ function problem = perturb_problem(base, seed)
         (rand(size(lb(finite_lb))) - 1);
     ub(finite_ub) = ub_work(finite_ub) + scale(finite_ub) .* ...
         (rand(size(ub(finite_ub))) - 1);
+    % Fix selected variables by making their lower and upper bounds equal.
     candidates = find(isfinite(lb) & isfinite(ub));
     fixed = candidates(rand(numel(candidates), 1) < 0.2);
     choose_lower = rand(numel(fixed), 1) < 0.5;
@@ -109,8 +111,10 @@ function value = contaminate(value, x, seed, salt)
         seed (1, 1) double
         salt (1, 1) double
     end
+    % Restore the caller's random stream even when evaluation throws.
     original_rng = rng();
     cleanup = onCleanup(@() rng(original_rng));
+    % Derive repeatable noise from the point; salt separates output components.
     point_hex = num2hex(x(:));
     local_seed = mod(seed + salt + sum(double(point_hex(:))), 2^32);
     rng(local_seed, 'twister');
