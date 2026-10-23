@@ -59,6 +59,8 @@ Value Recorded Problem 可以记录函数名以及每一次调用时的函数值
 2. tough problem
 3. wrap problem
 4. run problem in two solver
+    - prepare random option for the solver
+    - edit option
 5. compare result
 
 ## Compare Data
