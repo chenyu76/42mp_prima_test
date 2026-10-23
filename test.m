@@ -1,7 +1,7 @@
 function differences = test(mindim, maxdim)
     %TEST Compare PRIMA's Fortran and MATLAB backends on tough problems.
     % Requires MatCUTEst and PRIMA to be available in the prepared environment.
-    % Returns only differing problems, keyed by MATLAB-valid problem names.
+    % Returns differing branches organized by problem name and solver name.
     arguments (Input)
         mindim (1, 1) double {mustBeInteger, mustBePositive}
         maxdim (1, 1) double {mustBeInteger, mustBePositive}
@@ -17,14 +17,41 @@ function differences = test(mindim, maxdim)
     names = matlab.lang.makeUniqueStrings(names, {}, namelengthmax);
     differences = struct();
     for i = 1:numel(problems)
-        % Generate once so backend choice is the only intentional input difference.
+        % Reuse the same random options for all applicable solvers on this problem.
         options = random_prima_options(numel(problems(i).x0));
-        fortran_record = run_problem(problems(i), options, true);
-        matlab_record = run_problem(problems(i), options, false);
-        child = compare_struct_trees(fortran_record, matlab_record, "Fortran", "MATLAB");
-        if ~isempty(fieldnames(child))
-            differences.(names{i}) = child;
+        problem_differences = struct();
+        for solver = applicable_solvers(problems(i))
+            options.solver = solver;
+            fortran_record = run_problem(problems(i), options, true);
+            matlab_record = run_problem(problems(i), options, false);
+            child = compare_struct_trees(fortran_record, matlab_record, "Fortran", "MATLAB");
+            if ~isempty(fieldnames(child))
+                problem_differences.(solver) = child;
+            end
         end
+        if ~isempty(fieldnames(problem_differences))
+            differences.(names{i}) = problem_differences;
+        end
+    end
+end
+
+function solvers = applicable_solvers(problem)
+    arguments (Input)
+        problem (1, 1) struct
+    end
+    arguments (Output)
+        solvers (1, :) string
+    end
+
+    % Use the supplied constraints, before PRIMA removes or reduces any of them.
+    if ~isempty(problem.nonlcon)
+        solvers = "cobyla";
+    elseif ~isempty(problem.Aineq) || ~isempty(problem.Aeq)
+        solvers = ["lincoa", "cobyla"];
+    elseif any(problem.lb ~= -Inf, 'all') || any(problem.ub ~= Inf, 'all')
+        solvers = ["bobyqa", "lincoa", "cobyla"];
+    else
+        solvers = ["uobyqa", "newuoa", "bobyqa", "lincoa", "cobyla"];
     end
 end
 
@@ -47,7 +74,7 @@ function record = run_problem(source, options, use_fortran)
     result = struct('x', [], 'fx', [], 'exitflag', [], 'output', struct());
     failure = struct('identifier', "", 'message', "");
     try
-        % PRIMA selects a suitable algorithm from the problem's constraint type.
+        % Both backends receive the same explicitly selected solver.
         [result.x, result.fx, result.exitflag, result.output] = prima(problem);
     catch exception
         failure.identifier = string(exception.identifier);
