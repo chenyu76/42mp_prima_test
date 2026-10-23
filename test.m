@@ -1,22 +1,42 @@
-function differences = test(mindim, maxdim)
-    %TEST Compare PRIMA's Fortran and MATLAB backends on tough problems.
-    % Requires MatCUTEst and PRIMA to be available in the prepared environment.
+function differences = test(mindim, maxdim, n_jobs)
+    % TEST Compare PRIMA's Fortran and MATLAB backends on tough problems.
+    % Requires MatCUTEst, PRIMA, and Parallel Computing Toolbox.
     % Returns differing branches organized by problem name and solver name.
     arguments (Input)
         mindim (1, 1) double {mustBeInteger, mustBePositive}
         maxdim (1, 1) double {mustBeInteger, mustBePositive}
+        n_jobs (1, 1) double {mustBeInteger, mustBePositive}
     end
     arguments (Output)
         differences (1, 1) struct
     end
 
+    % MatCUTEst changes paths and holds MEX state, requiring separate processes.
+    pool = gcp('nocreate');
+    if ~isempty(pool)
+        assert(~isa(pool, 'parallel.ThreadPool'), 'MatCUTEst requires a process-based pool.');
+        if pool.NumWorkers ~= n_jobs
+            % Recreate an existing pool when the requested worker count changes.
+            delete(pool);
+            pool = [];
+        end
+    end
+    if isempty(pool)
+        parpool('Processes', n_jobs);
+    end
+
     problems = load_matcutest_problems(mindim, maxdim);
+    base_names = {problems.name};
     problems = tough_problems(problems);
     % Decimal points and other punctuation cannot occur in struct field names.
     names = matlab.lang.makeValidName({problems.name});
     names = matlab.lang.makeUniqueStrings(names, {}, namelengthmax);
     differences = struct();
-    for i = 1:numel(problems)
+
+    problem_results = cell(1, numel(problems));
+    parfor (i = 1:numel(problems), n_jobs)
+        % MEX function handles do not transfer initialized CUTEst state to workers.
+        macup(base_names{i});
         % Reuse the same random options for all applicable solvers on this problem.
         options = random_prima_options(numel(problems(i).x0));
         problem_differences = struct();
@@ -29,8 +49,12 @@ function differences = test(mindim, maxdim)
                 problem_differences.(solver) = child;
             end
         end
-        if ~isempty(fieldnames(problem_differences))
-            differences.(names{i}) = problem_differences;
+        problem_results{i} = problem_differences;
+    end
+    % Merge sliced results in input order, independent of worker completion order.
+    for i = 1:numel(problems)
+        if ~isempty(fieldnames(problem_results{i}))
+            differences.(names{i}) = problem_results{i};
         end
     end
 end

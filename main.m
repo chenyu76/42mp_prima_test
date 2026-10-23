@@ -1,4 +1,4 @@
-function differences = main(prima_dir, matcutest_paths, mindim, maxdim)
+function differences = main(prima_dir, matcutest_paths, mindim, maxdim, n_jobs)
     % MAIN Entry point for the rewritten bit-consistency test.
     % Returns the difference tree and saves results/<timestamp>/differences.json.
     arguments (Input)
@@ -6,13 +6,14 @@ function differences = main(prima_dir, matcutest_paths, mindim, maxdim)
         matcutest_paths (1, :) string
         mindim (1, 1) double {mustBeInteger, mustBePositive}
         maxdim (1, 1) double {mustBeInteger, mustBePositive}
+        n_jobs (1, 1) double {mustBeInteger, mustBePositive}
     end
     arguments (Output)
         differences (1, 1) struct
     end
 
     prepare_environment(prima_dir, matcutest_paths);
-    differences = test(mindim, maxdim);
+    differences = test(mindim, maxdim, n_jobs);
     save_test_output(differences);
 end
 
