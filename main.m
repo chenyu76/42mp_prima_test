@@ -17,6 +17,25 @@ function [differences, problem_list] = main(prima_dir, matcutest_paths, mindim, 
     prepare_environment(prima_dir, matcutest_paths);
     [differences, problem_list] = test(mindim, maxdim, n_jobs, run_seed);
     save_test_output(differences, problem_list);
+    summarize_differences(differences);
+end
+
+function summarize_differences(differences)
+    % SUMMARIZE_DIFFERENCES Print counts of problems and solver pairs with differences.
+    arguments
+        differences (1, 1) struct
+    end
+
+    problems = fieldnames(differences);
+    if isempty(problems)
+        fprintf('Congratulations! No differences found. :)\n');
+        return
+    end
+    n_pairs = 0;
+    for i = 1:numel(problems)
+        n_pairs = n_pairs + numel(fieldnames(differences.(problems{i})));
+    end
+    fprintf('Differences: %d problems, %d problem-solver pairs.\n', numel(problems), n_pairs);
 end
 
 function save_test_output(differences, problem_list)
