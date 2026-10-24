@@ -16,8 +16,10 @@ function [differences, problem_list] = main(prima_dir, matcutest_paths, mindim, 
         problem_list (1, :) struct
     end
     assert(run_seed + repeat < 2^32, 'Repeated run seeds must remain below 2^32.');
+    start_time = tic;
 
     prepare_environment(prima_dir, matcutest_paths);
+
     differences = struct();
     problem_lists = cell(1, repeat);
     for i = 1:repeat
@@ -30,8 +32,11 @@ function [differences, problem_list] = main(prima_dir, matcutest_paths, mindim, 
         end
     end
     problem_list = [problem_lists{:}];
+
     save_output({differences, problem_list}, ["differences.json", "problems.json"]);
     summarize_differences(differences);
+
+    fprintf('Total elapsed time: %.2f seconds.\n', toc(start_time));
 end
 
 function summarize_differences(differences)
