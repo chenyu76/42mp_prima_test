@@ -1,0 +1,4 @@
+[submodule "prima"]
+	path = prima
+	url = https://github.com/chenyu76/prima.git
+	branch = pure_matlab
