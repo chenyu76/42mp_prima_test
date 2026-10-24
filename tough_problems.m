@@ -34,7 +34,7 @@ function problem = perturb_problem(base, seed)
     problem = base;
     noise_level = 0.2;
     problem.name = sprintf('%s_tough_noise%g_fail1_invalid1_fixed1_seed%010u', ...
-        base.name, noise_level, uint32(seed));
+                           base.name, noise_level, uint32(seed));
     problem.x0 = base.x0 + noise_level * max(1, abs(base.x0)) .* randn(size(base.x0));
 
     % Empty PRIMA bounds mean that every variable is unbounded on that side.

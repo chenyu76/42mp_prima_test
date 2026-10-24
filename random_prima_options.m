@@ -1,5 +1,5 @@
 function [options, scenario] = random_prima_options(n, seed, reference_value)
-    %RANDOM_PRIMA_OPTIONS Generate random PRIMA options, including invalid values.
+    % RANDOM_PRIMA_OPTIONS Generate random PRIMA options, including invalid values.
     % Without a seed, draws advance the caller's stream. An explicit seed
     % reproduces options without changing that stream.
     % Eight boundary cases each have probability 1/10; random cases have 2/10.
