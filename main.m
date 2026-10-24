@@ -2,11 +2,11 @@ function [differences, problem_list] = main(prima_dir, matcutest_paths, mindim, 
     % MAIN Entry point for the rewritten bit-consistency test.
     % Returns differences and problem_list, saved under results/<timestamp>/.
     arguments (Input)
-        prima_dir (1, 1) string
-        matcutest_paths (1, :) string
-        mindim (1, 1) double {mustBeInteger, mustBePositive}
-        maxdim (1, 1) double {mustBeInteger, mustBePositive}
-        n_jobs (1, 1) double {mustBeInteger, mustBePositive}
+        prima_dir (1, 1) string = ""
+        matcutest_paths (1, :) string = ""
+        mindim (1, 1) double {mustBeInteger, mustBePositive} = 1
+        maxdim (1, 1) double {mustBeInteger, mustBePositive} = 5
+        n_jobs (1, 1) double {mustBeInteger, mustBePositive} = 4
         run_seed (1, 1) double {mustBeInteger, mustBeNonnegative, mustBeLessThan(run_seed, 4294967296)} = 0
     end
     arguments (Output)
