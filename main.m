@@ -33,13 +33,17 @@ function [differences, problem_list] = main(prima_dir, matcutest_paths, mindim, 
     end
     problem_list = [problem_lists{:}];
 
-    save_output({differences, problem_list}, ["differences.json", "problems.json"]);
-    summarize_differences(differences);
+    have_differences = summarize_differences(differences);
+    if have_differences
+        save_output({differences, problem_list}, ["differences.json", "problems.json"]);
+    else
+        save_output({struct()}, ["no_differences.json"]);
+    end
 
     fprintf('Total elapsed time: %.2f seconds.\n', toc(start_time));
 end
 
-function summarize_differences(differences)
+function have_differences = summarize_differences(differences)
     % SUMMARIZE_DIFFERENCES Print counts of problems and solver pairs with differences.
     arguments
         differences (1, 1) struct
@@ -47,14 +51,16 @@ function summarize_differences(differences)
 
     problems = fieldnames(differences);
     if isempty(problems)
+        have_differences = false;
         fprintf('Congratulations! No differences found. :)\n');
-        return
+    else
+        have_differences = true;
+        n_pairs = 0;
+        for i = 1:numel(problems)
+            n_pairs = n_pairs + numel(fieldnames(differences.(problems{i})));
+        end
+        fprintf('Differences: %d problems, %d problem-solver pairs.\n', numel(problems), n_pairs);
     end
-    n_pairs = 0;
-    for i = 1:numel(problems)
-        n_pairs = n_pairs + numel(fieldnames(differences.(problems{i})));
-    end
-    fprintf('Differences: %d problems, %d problem-solver pairs.\n', numel(problems), n_pairs);
 end
 
 function save_output(struct_list, filename_list)
