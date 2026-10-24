@@ -1,22 +1,36 @@
-function [differences, problem_list] = main(prima_dir, matcutest_paths, mindim, maxdim, n_jobs, run_seed)
+function [differences, problem_list] = main(prima_dir, matcutest_paths, mindim, maxdim, n_jobs, run_seed, repeat)
     % MAIN Entry point for the rewritten bit-consistency test.
-    % Returns differences and problem_list, saved under results/<timestamp>/.
+    % Repeats with consecutive run seeds and saves merged results/<timestamp>/.
     arguments (Input)
         prima_dir (1, 1) string = "./prima/"
         matcutest_paths (1, :) string = "~/.local/matcutest/mtools/src/"
         mindim (1, 1) double {mustBeInteger, mustBePositive} = 1
         maxdim (1, 1) double {mustBeInteger, mustBePositive} = 100
         n_jobs (1, 1) double {mustBeInteger, mustBePositive} = 40
-        run_seed (1, 1) double {mustBeInteger, mustBeNonnegative, mustBeLessThan(run_seed, 4294967296)} = 0
+        run_seed (1, 1) double {mustBeInteger, mustBeNonnegative, mustBeLessThan(run_seed, 4294967296)} = ...
+            mod(floor(posixtime(datetime('now')) * 1000), 2^32)
+        repeat (1, 1) double {mustBeInteger, mustBePositive} = 10
     end
     arguments (Output)
         differences (1, 1) struct
         problem_list (1, :) struct
     end
+    assert(run_seed + repeat < 2^32, 'Repeated run seeds must remain below 2^32.');
 
     prepare_environment(prima_dir, matcutest_paths);
-    [differences, problem_list] = test(mindim, maxdim, n_jobs, run_seed);
-    save_test_output(differences, problem_list);
+    differences = struct();
+    problem_lists = cell(1, repeat);
+    for i = 1:repeat
+
+        [run_differences, problem_lists{i}] = test(mindim, maxdim, n_jobs, run_seed + i);
+
+        names = fieldnames(run_differences);
+        for j = 1:numel(names)
+            differences.(names{j}) = run_differences.(names{j});
+        end
+    end
+    problem_list = [problem_lists{:}];
+    save_output({differences, problem_list}, ["differences.json", "problems.json"]);
     summarize_differences(differences);
 end
 
@@ -38,19 +52,21 @@ function summarize_differences(differences)
     fprintf('Differences: %d problems, %d problem-solver pairs.\n', numel(problems), n_pairs);
 end
 
-function save_test_output(differences, problem_list)
+function save_output(struct_list, filename_list)
     arguments
-        differences (1, 1) struct
-        problem_list (1, :) struct
+        struct_list (1, :) cell
+        filename_list (1, :) string
     end
+    assert(numel(struct_list) == numel(filename_list), 'Output and filename lists must have equal lengths.');
 
     stamp = char(datetime('now', 'Format', 'yyyyMMdd_HHmmss'));
     output_dir = fullfile(fileparts(mfilename('fullpath')), 'results', stamp);
     [created, message] = mkdir(output_dir);
     assert(created, 'Cannot create output directory %s: %s', output_dir, message);
-    write_json(fullfile(output_dir, 'differences.json'), differences);
-    write_json(fullfile(output_dir, 'problems.json'), problem_list);
-    fprintf('Test output saved in %s\n', output_dir);
+    for i = 1:numel(struct_list)
+        write_json(fullfile(output_dir, char(filename_list(i))), struct_list{i});
+    end
+    fprintf('Output saved in %s\n', output_dir);
 end
 
 function write_json(output_file, value)
