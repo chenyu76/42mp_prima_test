@@ -3,3 +3,4 @@ optiprofiler/
 .venv/
 __pycache__/
 pycutest_cache_holder/
+results/
