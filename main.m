@@ -3,7 +3,7 @@ function [differences, problem_list] = main(prima_dir, matcutest_paths, mindim, 
     % Returns differences and problem_list, saved under results/<timestamp>/.
     arguments (Input)
         prima_dir (1, 1) string = "./prima/"
-        matcutest_paths (1, :) string = ""
+        matcutest_paths (1, :) string = "~/.local/matcutest/mtools/src/"
         mindim (1, 1) double {mustBeInteger, mustBePositive} = 1
         maxdim (1, 1) double {mustBeInteger, mustBePositive} = 5
         n_jobs (1, 1) double {mustBeInteger, mustBePositive} = 4

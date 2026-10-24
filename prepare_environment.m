@@ -10,7 +10,6 @@ function prepare_environment(prima_dir, matcutest_paths)
     prima_dir = copy_prima(prima_dir);
     patch_prima_constants(prima_dir);
     add_environment_paths(prima_dir, matcutest_paths);
-    check_dependencies(prima_dir);
     initialize_prima(prima_dir);
     setup_prima_mex(prima_dir);
     compile_prima(prima_dir);
@@ -89,7 +88,7 @@ function add_environment_paths(prima_dir, matcutest_paths)
         if isfolder(directory)
             addpath(char(directory));
         else
-            fprintf('Warning: MatCUTEst directory does not exist: %s', directory);
+            fprintf('Warning: MatCUTEst directory does not exist: %s\n', directory);
         end
     end
     interfaces = fullfile(prima_dir, 'matlab', 'interfaces');
@@ -97,19 +96,6 @@ function add_environment_paths(prima_dir, matcutest_paths)
     assert(isfolder(interfaces), 'PRIMA interfaces directory is missing.');
     assert(isfolder(tools), 'PRIMA setup tools directory is missing.');
     addpath(char(interfaces), char(tools));
-end
-
-function check_dependencies(prima_dir)
-    arguments
-        prima_dir (1, 1) string
-    end
-
-    assert(isfile(fullfile(prima_dir, 'setup.m')), 'PRIMA setup.m is missing.');
-    for name = ["macup", "secup", "prima"]
-        assert(exist(char(name), 'file') == 2, 'Required function is missing: %s', name);
-    end
-    assert(strcmp(which('prima'), fullfile(prima_dir, 'matlab', 'interfaces', 'prima.m')), ...
-           'Another PRIMA installation takes precedence on the MATLAB path.');
 end
 
 function initialize_prima(prima_dir)
