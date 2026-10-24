@@ -54,6 +54,7 @@ function [differences, problem_list] = test(mindim, maxdim, n_jobs, run_seed)
         solver_options = struct();
         problem_differences = struct();
         for solver = solvers
+
             options = common_options;
             options.solver = solver;
             options.output_xhist = true;
@@ -61,11 +62,15 @@ function [differences, problem_list] = test(mindim, maxdim, n_jobs, run_seed)
             if solver == "cobyla"
                 options.output_nlchist = true;
             end
+
             solver_seed = derive_seed(run_seed, string(base_names{i}) + ":solver:" + solver);
             solver_seeds.(solver) = solver_seed;
             solver_options.(solver) = options;
+
+            % run problem
             fortran_record = run_problem(problems(i), options, true, solver_seed);
             matlab_record = run_problem(problems(i), options, false, solver_seed);
+
             child = compare_struct_trees(fortran_record, matlab_record, "Fortran", "MATLAB");
             if ~isempty(fieldnames(child))
                 problem_differences.(solver) = child;
@@ -77,6 +82,7 @@ function [differences, problem_list] = test(mindim, maxdim, n_jobs, run_seed)
                                     'options_seed', options_seed, 'scenario', scenario, ...
                                     'options', solver_options, 'solver_seeds', solver_seeds);
         problem_results{i} = problem_differences;
+        fprintf('\nCompleted problem %d/%d: %s\n', i, numel(problems), base_names{i});
     end
     % Merge sliced results in input order, independent of worker completion order.
     if isempty(problem_entries)
