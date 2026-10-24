@@ -86,8 +86,11 @@ function add_environment_paths(prima_dir, matcutest_paths)
     end
 
     for directory = matcutest_paths
-        assert(isfolder(directory), 'MatCUTEst directory does not exist: %s', directory);
-        addpath(char(directory));
+        if isfolder(directory)
+            addpath(char(directory));
+        else
+            fprintf('Warning: MatCUTEst directory does not exist: %s', directory);
+        end
     end
     interfaces = fullfile(prima_dir, 'matlab', 'interfaces');
     tools = fullfile(prima_dir, 'matlab', 'setup_tools');
