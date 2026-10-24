@@ -5,7 +5,7 @@ function [differences, problem_list] = main(prima_dir, matcutest_paths, mindim, 
         prima_dir (1, 1) string = "./prima/"
         matcutest_paths (1, :) string = "~/.local/matcutest/mtools/src/"
         mindim (1, 1) double {mustBeInteger, mustBePositive} = 1
-        maxdim (1, 1) double {mustBeInteger, mustBePositive} = 20
+        maxdim (1, 1) double {mustBeInteger, mustBePositive} = 100
         n_jobs (1, 1) double {mustBeInteger, mustBePositive} = 40
         run_seed (1, 1) double {mustBeInteger, mustBeNonnegative, mustBeLessThan(run_seed, 4294967296)} = 0
     end
