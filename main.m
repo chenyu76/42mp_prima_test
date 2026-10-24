@@ -9,7 +9,8 @@ function [differences, problem_list] = main(prima_dir, matcutest_paths, mindim, 
         n_jobs (1, 1) double {mustBeInteger, mustBePositive} = 40
         run_seed (1, 1) double {mustBeInteger, mustBeNonnegative, mustBeLessThan(run_seed, 4294967296)} = ...
             mod(floor(posixtime(datetime('now')) * 1000), 2^32)
-        repeat (1, 1) double {mustBeInteger, mustBePositive} = 10
+        % 10 repeat needs ~4000s
+        repeat (1, 1) double {mustBeInteger, mustBePositive} = 20
     end
     arguments (Output)
         differences (1, 1) struct
