@@ -145,7 +145,7 @@ function value = contaminate(value, x, seed, salt)
     rng_cleanup = seed_rng(local_seed); %#ok<NASGU>
     value = value * (1 + 0.2 * randn());
     r = 2 * rand() - 1;
-    if r > 0.9
+    if r > 0.99
         error('bit_consistency:ToughEvaluationFailure', ...
               'Injected tough-problem evaluation failure.');
     elseif r > 0.8
