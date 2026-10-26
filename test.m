@@ -45,23 +45,18 @@ function [differences, problem_list] = test(mindim, maxdim, n_jobs, run_seed)
     parfor (i = 1:numel(problems), n_jobs)
         % MEX function handles do not transfer initialized CUTEst state to workers.
         macup(base_names{i});
-        % Reuse the same random options for all applicable solvers on this problem.
+        % Use the same seed to generate solver-specific options on this problem.
         options_seed = derive_seed(run_seed, string(base_names{i}) + ":options");
         n = numel(problems(i).x0);
-        [common_options, scenario] = random_prima_options(n, options_seed, problems(i).f0);
         solvers = applicable_solvers(problems(i));
         solver_seeds = struct();
         solver_options = struct();
+        solver_scenarios = struct();
         problem_differences = struct();
         for solver = solvers
 
-            options = common_options;
-            options.solver = solver;
-            options.output_xhist = true;
-            options.maxhist = 200 * n;
-            if solver == "cobyla"
-                options.output_nlchist = true;
-            end
+            [options, scenario] = random_prima_options(n, solver, options_seed, problems(i).f0);
+            solver_scenarios.(solver) = scenario;
 
             solver_seed = derive_seed(run_seed, string(base_names{i}) + ":solver:" + solver);
             solver_seeds.(solver) = solver_seed;
@@ -79,7 +74,7 @@ function [differences, problem_list] = test(mindim, maxdim, n_jobs, run_seed)
         % Keep actual inputs for inspection, and seeds for replaying each stage.
         problem_entries{i} = struct('name', problems(i).name, 'base_name', base_names{i}, ...
                                     'problem', problems(i), 'run_seed', run_seed, 'tough_seed', tough_seeds(i), ...
-                                    'options_seed', options_seed, 'scenario', scenario, ...
+                                    'options_seed', options_seed, 'scenario', solver_scenarios, ...
                                     'options', solver_options, 'solver_seeds', solver_seeds);
         problem_results{i} = problem_differences;
         fprintf('\nCompleted problem %d/%d: %s\n', i, numel(problems), base_names{i});
