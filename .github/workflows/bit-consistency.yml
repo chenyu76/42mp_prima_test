@@ -162,9 +162,9 @@ jobs:
             assert(install(fullfile(project_dir, 'ci-deps')), ...
                 'CI:MatCUTEstInstallFailed', 'MatCUTEst installation failed.');
             cd(project_dir);
-            n_jobs = str2double(getenv('CI_WORKERS'));
+            n_jobs = 2;
             seed = mod(floor(posixtime(datetime('now')) * 1000), 2^32);
-            repeat = 1;
+            repeat = 2;
             main('./prima/', './ci-deps/matcutest/mtools/src/', 1, 100, n_jobs, seed, repeat);
 
       - name: Record final runner resources
