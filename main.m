@@ -9,7 +9,7 @@ function [differences, problem_list] = main(prima_dir, matcutest_paths, mindim, 
         n_jobs (1, 1) double {mustBeInteger, mustBePositive} = 40
         run_seed (1, 1) double {mustBeInteger, mustBeNonnegative, mustBeLessThan(run_seed, 4294967296)} = ...
             mod(floor(posixtime(datetime('now')) * 1000), 2^32)
-        % 10 repeat needs ~4000s
+        % 10 repeat needs ~4000s at zDP
         repeat (1, 1) double {mustBeInteger, mustBePositive} = 20
     end
     arguments (Output)
@@ -24,7 +24,7 @@ function [differences, problem_list] = main(prima_dir, matcutest_paths, mindim, 
     differences = struct();
     problem_lists = cell(1, repeat);
     for i = 1:repeat
-
+        fprintf('Round %d/%d (run seed %u).\n', i, repeat, run_seed + i);
         [run_differences, problem_lists{i}] = test(mindim, maxdim, n_jobs, run_seed + i);
 
         names = fieldnames(run_differences);
@@ -42,6 +42,11 @@ function [differences, problem_list] = main(prima_dir, matcutest_paths, mindim, 
     end
 
     fprintf('Total elapsed time: %.2f seconds.\n', toc(start_time));
+    if have_differences
+        error('BitConsistency:Mismatch', ...
+              'Differences detected in round %d/%d (run seed %u). Reports saved in results/.', ...
+              i, repeat, run_seed + i);
+    end
 end
 
 function have_differences = summarize_differences(differences)

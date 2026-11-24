@@ -1,0 +1,111 @@
+name: Bit consistency
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    # GitHub cron uses UTC: 16:00 UTC is 00:00 the next day in Beijing.
+    - cron: "0 16 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  check_version:
+    runs-on: ubuntu-22.04
+    permissions:
+      actions: read
+    outputs:
+      run_tests: ${{ steps.history.outputs.run_tests }}
+    steps:
+      - name: Check whether this version already failed
+        id: history
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          if [[ "$EVENT_NAME" != "schedule" ]]; then
+            echo "run_tests=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          failed_run_ids=$(gh api --paginate --method GET \
+            "repos/$GITHUB_REPOSITORY/actions/workflows/bit-consistency.yml/runs" \
+            -f head_sha="$GITHUB_SHA" -f status=failure -f per_page=100 \
+            --jq '.workflow_runs[].id')
+
+          while IFS= read -r run_id; do
+            [[ -z "$run_id" ]] && continue
+            failed_test_job=$(gh api --paginate \
+              "repos/$GITHUB_REPOSITORY/actions/runs/$run_id/jobs?per_page=100" \
+              --jq '.jobs[] | select(.name == "Bit consistency tests" and .conclusion == "failure") | .id')
+            if [[ -n "$failed_test_job" ]]; then
+              echo "run_tests=false" >> "$GITHUB_OUTPUT"
+              echo "Skipping tests: commit $GITHUB_SHA already failed in [run $run_id]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$run_id)." >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+          done <<< "$failed_run_ids"
+
+          echo "run_tests=true" >> "$GITHUB_OUTPUT"
+
+  test:
+    name: Bit consistency tests
+    needs: check_version
+    if: ${{ needs.check_version.outputs.run_tests == 'true' }}
+    runs-on: ubuntu-22.04
+    env:
+      # Private repositories require a MATLAB batch licensing token.
+      MLM_LICENSE_TOKEN: ${{ secrets.MLM_LICENSE_TOKEN }}
+    steps:
+      - name: Check out project and PRIMA
+        uses: actions/checkout@v7
+        with:
+          submodules: true
+
+      - name: Install Fortran compiler and 7-Zip
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gfortran-10 p7zip-full
+          sudo update-alternatives --install /usr/bin/gfortran gfortran /usr/bin/gfortran-10 100
+          sudo update-alternatives --set gfortran /usr/bin/gfortran-10
+          gfortran --version
+          echo "CI_WORKERS=$(nproc)" >> "$GITHUB_ENV"
+
+      - name: Check out compiled MatCUTEst
+        uses: actions/checkout@v7
+        with:
+          repository: matcutest/matcutest_compiled
+          path: ci-deps/matcutest-source
+
+      - name: Set up MATLAB
+        uses: matlab-actions/setup-matlab@v3
+        with:
+          release: R2026a
+          products: Parallel_Computing_Toolbox
+
+      - name: Run bit consistency tests
+        uses: matlab-actions/run-command@v3
+        with:
+          command: |
+            project_dir = pwd();
+            mkdir('results');
+            diary('results/matlab.log');
+            ver;
+            mex('-setup', 'Fortran');
+            addpath('ci-deps/matcutest-source');
+            assert(install(fullfile(project_dir, 'ci-deps')), ...
+                'CI:MatCUTEstInstallFailed', 'MatCUTEst installation failed.');
+            cd(project_dir);
+            n_jobs = str2double(getenv('CI_WORKERS'));
+            seed = mod(floor(posixtime(datetime('now')) * 1000), 2^32);
+            repeat = 1;
+            main('./prima/', './ci-deps/matcutest/mtools/src/', 1, 100, n_jobs, seed, repeat);
+
+      - name: Upload reports and MATLAB log
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: bit-consistency-results
+          path: results/
+          if-no-files-found: warn
