@@ -102,6 +102,15 @@ jobs:
           git -C prima checkout --detach "$PRIMA_SHA"
           test "$(git -C prima rev-parse HEAD)" = "$PRIMA_SHA"
 
+      - name: Record tested commits
+        run: |
+          mkdir -p results
+          {
+            printf 'Repository: %s\n' "$GITHUB_REPOSITORY"
+            printf 'Main commit: %s\n' "$(git rev-parse HEAD)"
+            printf 'PRIMA commit: %s\n' "$(git -C prima rev-parse HEAD)"
+          } > results/commits.txt
+
       - name: Check out MatCUTEst's shared CI setup scripts
         uses: actions/checkout@v7
         with:
@@ -126,7 +135,6 @@ jobs:
           sudo update-alternatives --install /usr/bin/gfortran gfortran /usr/bin/gfortran-10 100
           sudo update-alternatives --set gfortran /usr/bin/gfortran-10
           gfortran --version
-          echo "CI_WORKERS=$(nproc)" >> "$GITHUB_ENV"
 
       - name: Check out compiled MatCUTEst
         uses: actions/checkout@v7
@@ -178,10 +186,20 @@ jobs:
             swapon --show
           } | tee results/runner-resources-after.txt
 
-      - name: Upload reports and MATLAB log
+      - name: Upload reports and tested commits
         if: ${{ always() }}
         uses: actions/upload-artifact@v7
         with:
           name: bit-consistency-results
-          path: results/
+          path: |
+            results/
+            !results/matlab.log
+          if-no-files-found: warn
+
+      - name: Upload MATLAB log
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: bit-consistency-matlab-log
+          path: results/matlab.log
           if-no-files-found: warn
