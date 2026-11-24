@@ -16,14 +16,31 @@ jobs:
     runs-on: ubuntu-22.04
     permissions:
       actions: read
+      contents: read
     outputs:
       run_tests: ${{ steps.history.outputs.run_tests }}
+      prima_sha: ${{ steps.prima.outputs.sha }}
     steps:
+      - name: Check out project
+        uses: actions/checkout@v7
+
+      - name: Resolve latest PRIMA commit
+        id: prima
+        run: |
+          prima_url=$(git config -f .gitmodules --get submodule.prima.url)
+          prima_branch=$(git config -f .gitmodules --get submodule.prima.branch)
+          prima_sha=$(git ls-remote --exit-code "$prima_url" "refs/heads/$prima_branch" | cut -f1)
+          [[ "$prima_sha" =~ ^[0-9a-f]{40}$ ]]
+          echo "sha=$prima_sha" >> "$GITHUB_OUTPUT"
+          echo "Main commit: $GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
+          echo "PRIMA branch: $prima_branch; commit: $prima_sha" >> "$GITHUB_STEP_SUMMARY"
+
       - name: Check whether this version already failed
         id: history
         env:
           GH_TOKEN: ${{ github.token }}
           EVENT_NAME: ${{ github.event_name }}
+          PRIMA_SHA: ${{ steps.prima.outputs.sha }}
         run: |
           if [[ "$EVENT_NAME" != "schedule" ]]; then
             echo "run_tests=true" >> "$GITHUB_OUTPUT"
@@ -39,10 +56,10 @@ jobs:
             [[ -z "$run_id" ]] && continue
             failed_test_job=$(gh api --paginate \
               "repos/$GITHUB_REPOSITORY/actions/runs/$run_id/jobs?per_page=100" \
-              --jq '.jobs[] | select(.name == "Bit consistency tests" and .conclusion == "failure") | .id')
+              --jq ".jobs[] | select(.name == \"Bit consistency tests (PRIMA $PRIMA_SHA)\" and .conclusion == \"failure\") | .id")
             if [[ -n "$failed_test_job" ]]; then
               echo "run_tests=false" >> "$GITHUB_OUTPUT"
-              echo "Skipping tests: commit $GITHUB_SHA already failed in [run $run_id]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$run_id)." >> "$GITHUB_STEP_SUMMARY"
+              echo "Skipping tests: main commit $GITHUB_SHA and PRIMA commit $PRIMA_SHA already failed in [run $run_id]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$run_id)." >> "$GITHUB_STEP_SUMMARY"
               exit 0
             fi
           done <<< "$failed_run_ids"
@@ -50,7 +67,7 @@ jobs:
           echo "run_tests=true" >> "$GITHUB_OUTPUT"
 
   test:
-    name: Bit consistency tests
+    name: Bit consistency tests (PRIMA ${{ needs.check_version.outputs.prima_sha }})
     needs: check_version
     if: ${{ needs.check_version.outputs.run_tests == 'true' }}
     runs-on: ubuntu-22.04
@@ -58,15 +75,54 @@ jobs:
       # Private repositories require a MATLAB batch licensing token.
       MLM_LICENSE_TOKEN: ${{ secrets.MLM_LICENSE_TOKEN }}
     steps:
+      - name: Refresh package index before cleanup
+        run: sudo apt-get update
+
+      - name: Free disk space
+        # Use the same cleanup options as MatCUTEst's own CI.
+        uses: jlumbroso/free-disk-space@cf1e78c50ca91e757bab3edc229027eebfc07871
+        with:
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: false
+
       - name: Check out project and PRIMA
         uses: actions/checkout@v7
         with:
           submodules: true
 
+      - name: Check out resolved PRIMA commit
+        env:
+          PRIMA_SHA: ${{ needs.check_version.outputs.prima_sha }}
+        run: |
+          git -C prima fetch --depth=1 origin "$PRIMA_SHA"
+          git -C prima checkout --detach "$PRIMA_SHA"
+          test "$(git -C prima rev-parse HEAD)" = "$PRIMA_SHA"
+
+      - name: Check out MatCUTEst's shared CI setup scripts
+        uses: actions/checkout@v7
+        with:
+          repository: equipez/github_actions_scripts
+          ref: f03465375c6d516ef1cef594cbb3332745603b33
+          path: ci-deps/github-actions-scripts
+
+      - name: Configure runner resources
+        env:
+          SWAP_SIZE: 16
+        # Run after cleanup to restore dependencies and configure swap.
+        run: bash ci-deps/github-actions-scripts/misc_setup
+
       - name: Install Fortran compiler and 7-Zip
         run: |
           sudo apt-get update
-          sudo apt-get install -y gfortran-10 p7zip-full
+          sudo apt-get install -y gfortran-10 7zip
+          # Ubuntu 22.04 installs 7zz; MatCUTEst invokes the command 7z.
+          sudo ln -sf /usr/bin/7zz /usr/local/bin/7z
+          command -v 7z
+          7z | sed -n '1,4p'
           sudo update-alternatives --install /usr/bin/gfortran gfortran /usr/bin/gfortran-10 100
           sudo update-alternatives --set gfortran /usr/bin/gfortran-10
           gfortran --version
@@ -84,12 +140,21 @@ jobs:
           release: R2026a
           products: Parallel_Computing_Toolbox
 
+      - name: Record resources before MatCUTEst installation
+        run: |
+          mkdir -p results
+          {
+            df -h
+            df -i
+            free -h
+            swapon --show
+          } | tee results/runner-resources-before.txt
+
       - name: Run bit consistency tests
         uses: matlab-actions/run-command@v3
         with:
           command: |
             project_dir = pwd();
-            mkdir('results');
             diary('results/matlab.log');
             ver;
             mex('-setup', 'Fortran');
@@ -101,6 +166,17 @@ jobs:
             seed = mod(floor(posixtime(datetime('now')) * 1000), 2^32);
             repeat = 1;
             main('./prima/', './ci-deps/matcutest/mtools/src/', 1, 100, n_jobs, seed, repeat);
+
+      - name: Record final runner resources
+        if: ${{ always() }}
+        run: |
+          mkdir -p results
+          {
+            df -h
+            df -i
+            free -h
+            swapon --show
+          } | tee results/runner-resources-after.txt
 
       - name: Upload reports and MATLAB log
         if: ${{ always() }}
