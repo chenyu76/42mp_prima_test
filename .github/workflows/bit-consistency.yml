@@ -32,8 +32,8 @@ jobs:
           prima_sha=$(git ls-remote --exit-code "$prima_url" "refs/heads/$prima_branch" | cut -f1)
           [[ "$prima_sha" =~ ^[0-9a-f]{40}$ ]]
           echo "sha=$prima_sha" >> "$GITHUB_OUTPUT"
-          echo "Main commit: $GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
-          echo "PRIMA branch: $prima_branch; commit: $prima_sha" >> "$GITHUB_STEP_SUMMARY"
+          echo "Main commit: \`$GITHUB_SHA\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "PRIMA branch: \`$prima_branch\`; commit: \`$prima_sha\`" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Check whether this version already failed
         id: history
@@ -59,7 +59,7 @@ jobs:
               --jq ".jobs[] | select(.name == \"Bit consistency tests (PRIMA $PRIMA_SHA)\" and .conclusion == \"failure\") | .id")
             if [[ -n "$failed_test_job" ]]; then
               echo "run_tests=false" >> "$GITHUB_OUTPUT"
-              echo "Skipping tests: main commit $GITHUB_SHA and PRIMA commit $PRIMA_SHA already failed in [run $run_id]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$run_id)." >> "$GITHUB_STEP_SUMMARY"
+              echo "Skipping tests: This commit already failed in [run $run_id]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$run_id)." >> "$GITHUB_STEP_SUMMARY"
               exit 0
             fi
           done <<< "$failed_run_ids"
